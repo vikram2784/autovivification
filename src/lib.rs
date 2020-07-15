@@ -1,9 +1,8 @@
 #![allow(unused_macros, unused_imports)]
-#![macro_use]
 
 pub use std::any::Any;
-pub use std::borrow::BorrowMut;
 pub use std::collections::HashMap;
+pub use std::borrow::BorrowMut;
 pub use std::fmt::Debug;
 pub use std::stringify;
 
