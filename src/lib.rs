@@ -1,11 +1,12 @@
+#![allow(unused_macros, unused_imports)]
+
 use std::any::Any;
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::stringify;
 
-
-macro_rules! viv {
+macro_rules! iviv {
     ($last:ident, $b:expr, $e:expr) => {{
         if $b {
             let mut __value:HashMap<&str, Box<dyn Debug>> = HashMap::new();
@@ -24,7 +25,7 @@ macro_rules! viv {
                     .downcast_ref::<HashMap<&str, Box<dyn Debug>>>()
                     .unwrap()
                     .get("__value")
-                    .unwrap()) 
+                    .unwrap())
             } else if $last.len() > 0 {
                 Some($last as &dyn Debug)
             } else {
@@ -43,15 +44,19 @@ macro_rules! viv {
                         .unwrap()
                         .downcast_mut::<HashMap<&str, Box<dyn Any>>>()
                         .unwrap();
-        viv! ($inner$(.$inner1)*, $b, $e)
+        iviv! ($inner$(.$inner1)*, $b, $e)
     }};
 
+}
+
+#[macro_export]
+macro_rules! viv {
     ($outer:ident.$inner:ident$(.$inner1:ident)*, $e:expr) => {{
         let __r:&mut dyn Any = $outer.borrow_mut();
         let __root = __r
                     .downcast_mut::<HashMap<&str, Box<dyn Any>>>()
                     .unwrap();
-        viv!(__root.$inner$(.$inner1)*, true, $e)
+        iviv!(__root.$inner$(.$inner1)*, true, $e)
     }};
 
     ($outer:ident.$inner:ident$(.$inner1:ident)*) => {{
@@ -60,7 +65,7 @@ macro_rules! viv {
                     .downcast_mut::<HashMap<&str, Box<dyn Any>>>()
                     .unwrap();
 
-        viv!(__root.$inner$(.$inner1)*, false, 0)
+        iviv!(__root.$inner$(.$inner1)*, false, 0)
     }};
 
     ($outer:ident, $e:expr) => {{
@@ -69,7 +74,7 @@ macro_rules! viv {
                     .downcast_mut::<HashMap<&str, Box<dyn Any>>>()
                     .unwrap();
 
-        viv!(__root, true, $e)
+        iviv!(__root, true, $e)
     }};
 
     ($outer:ident) => {{
@@ -78,49 +83,89 @@ macro_rules! viv {
                     .downcast_mut::<HashMap<&str, Box<dyn Any>>>()
                     .unwrap();
 
-        viv!(__root, false, 0)
+        iviv!(__root, false, 0)
     }};
 }
 
-fn autoviv() -> Box<dyn Any> {
+pub fn autoviv() -> Box<dyn Any> {
     Box::new(HashMap::<&'static str, Box<dyn Any>>::new())
 }
 
-fn main() {
-    let mut food = autoviv();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    viv!(food, "tasty");
-    println!("{:?}", viv!(food));
+    #[test]
+    fn test_outer() {
+        let mut food = autoviv();
+        viv!(food, "tasty");
+        viv!(food).unwrap();
+    }
 
-    viv!(food.cold.dessert.icecream, "chocobar");
-    println!("{:?}", viv!(food.cold.dessert.icecream));
+    #[test]
+    fn test_nested() {
+        let mut food = autoviv();
+        viv!(food.cold.dessert.count, 11);
+        viv!(food.cold.dessert.count).unwrap();
+    }
 
-    println!("{:?}", viv!(food));  // {..} prints keys in the object
+    #[test]
+    fn test_nested2() {
+        let mut food = autoviv();
+        viv!(food.cold.dessert.grades, vec![1, 2, 3]);
+        viv!(food.cold.dessert.grades).unwrap();
+    }
 
-    viv!(food.cold.dessert.icecream, "vanillacup"); //overwrite
-    println!("{:?}", viv!(food.cold.dessert.icecream));
+    #[test]
+    fn test_outer_obj_key() {
+        let mut food = autoviv();
+        viv!(food.cold.dessert.icecream, "chocobar");
+        viv!(food.cold).unwrap();
+    }
 
-    viv!(food.cold.dessert.custard, "fruit");
-    println!("{:?}", viv!(food.cold.dessert.custard));
+    #[test]
+    fn test_middle_obj_key() {
+        let mut food = autoviv();
+        viv!(food.cold.dessert.icecream, "chocobar");
+        viv!(food.cold.dessert).unwrap();
+    }
 
-    println!("{:?}", viv!(food.cold)); // {..} prints keys in the object
-    println!("{:?}", viv!(food.cold.dessert)); // {..} prints keys in the object
-    println!("{:?}", viv!(food.cold.dessert.pudding)); //None, as it is not set
+    #[test]
+    fn test_outer_obj_key_absence() {
+        let mut food = autoviv();
+        viv!(food.cold.dessert.icecream, "chocobar");
+        assert!(if let Some(_) = viv!(food.hot) {
+            false
+        } else {
+            true
+        });
+    }
 
-    /*
-    viv!(food.cold.dessert.quantity, 100);
-    println!("{:?}", viv!(food.cold.dessert.quantity));
+    #[test]
+    fn test_middle_obj_key_absence() {
+        let mut food = autoviv();
+        viv!(food.cold.dessert.icecream, "chocobar");
+        assert!(if let Some(_) = viv!(food.hot.cold) {
+            false
+        } else {
+            true
+        });
+    }
 
-    viv!(food.cold.dessert.pudding, "chocolate");
-    println!("{:?}", viv!(food.cold.dessert.pudding));
+    #[test]
+    fn test_middle_obj_key_absence2() {
+        let mut food = autoviv();
+        assert!(if let Some(_) = viv!(food.hot.noodles) {
+            false
+        } else {
+            true
+        });
+    }
 
-    viv!(food.cold.dessert.icecream.grades, [1, 2, 3, 4, 5]);
-    println!("{:?}", viv!(food.cold.dessert.icecream.grades));
-
-    viv!(
-        food.export.countries,
-        vec!["India", "Denmark", "Sweden", "Japan"]
-    );
-    println!("{:?}", viv!(food.export.countries));
-    */
+    #[test]
+    fn test_obj_key_presence_after_read() {
+        let mut food = autoviv();
+        viv!(food.hot.noodles);
+        viv!(food.hot).unwrap();
+    }
 }
