@@ -6,4 +6,5 @@ steps:
 - name: build
   image: rust
   commands:
-  - cargo test
+  - cargo build --verbose --all
+  - cargo test --verbose --all
