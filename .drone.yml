@@ -4,6 +4,6 @@ name: default
 
 steps:
 - name: build
-  image: alpine
+  image: rust
   commands:
   - cargo test
